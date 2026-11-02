@@ -11,16 +11,18 @@ const tools = (operations as Operation[]).map((operation) => ({
 	config: {
 		description: operation.description,
 		inputSchema: fromJsonSchema<Record<string, unknown>>(operation.inputSchema, validator),
+		// Annotations come from the allowlist, not the HTTP method: Toggl's reports are POSTs that only read.
 		annotations: {
-			readOnlyHint: operation.method === "GET",
-			destructiveHint: operation.method === "DELETE",
-			idempotentHint: ["GET", "PUT", "DELETE"].includes(operation.method),
+			readOnlyHint: operation.kind === "read",
+			destructiveHint: operation.kind === "update" || operation.kind === "delete",
+			idempotentHint: operation.kind !== "create",
+			openWorldHint: false,
 		},
 	},
 }));
 
 function createServer() {
-	const server = new McpServer({ name: "toggl-mcp", version: "0.2.0" });
+	const server = new McpServer({ name: "toggl-mcp", version: "0.3.0" });
 	for (const { operation, config } of tools) {
 		server.registerTool(operation.name, config, (input) => callOperation(operation, input));
 	}

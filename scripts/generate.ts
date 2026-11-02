@@ -1,7 +1,8 @@
-// Turns Toggl's OpenAPI (Swagger 2.0) specs in specs/ into src/generated/operations.json, one MCP tool per operation.
+// Turns Toggl's OpenAPI (Swagger 2.0) specs in specs/ into src/generated/operations.json: one MCP tool for each operation in scripts/allowlist.ts.
 // Run with `pnpm generate` after `pnpm specs:fetch`.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { allowlist } from "./allowlist.ts";
 
 type Json = Record<string, any>;
 
@@ -145,5 +146,14 @@ for (const source of sources) {
 	}
 }
 
-writeFileSync("src/generated/operations.json", `${JSON.stringify(operations)}\n`);
-console.log(`Wrote ${operations.length} operations`);
+// Names are assigned across every operation first, so a tool keeps its name however the allowlist changes.
+const missing = Object.keys(allowlist).filter((name) => !names.has(name));
+if (missing.length > 0) {
+	throw new Error(`Allowlisted operations missing from the specs: ${missing.join(", ")}`);
+}
+const exposed = operations
+	.filter((operation) => operation.name in allowlist)
+	.map((operation) => ({ ...operation, kind: allowlist[operation.name] }));
+
+writeFileSync("src/generated/operations.json", `${JSON.stringify(exposed)}\n`);
+console.log(`Wrote ${exposed.length} of ${operations.length} operations`);

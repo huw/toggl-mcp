@@ -3,18 +3,26 @@
 A personal remote MCP server for [Toggl Track](https://toggl.com/track/), running on Cloudflare Workers. It speaks streamable HTTP at `/mcp`, so claude.ai, the Claude mobile apps and Claude's cloud sessions can use it as a custom connector.
 
 - **Single user, behind Cloudflare Access.** Access is the OAuth provider, through Managed OAuth, and an Access policy decides who may sign in. The Worker verifies the JWT Access attaches to every request it lets through, and refuses anything without a valid one.
-- **The whole Toggl API, 1:1.** Every operation in Toggl's published OpenAPI specs is one MCP tool: 283 Track API v9 operations, 36 Reports API v3 and Insights operations, and 10 Webhooks operations. There are no convenience tools and no reshaping of responses.
+- **A curated slice of the Toggl API, 1:1.** 59 operations from Toggl's published OpenAPI specs, each one MCP tool: time entries, projects, clients, tags, tasks and JSON reports. The rest of the API is left out on purpose (see below). There are no convenience tools, and responses come back as Toggl sends them, minus secrets.
 
 A stateless `createMcpHandler` from the Agents SDK serves MCP. There is no Durable Object and no `/sse` endpoint.
 
 ## Tools
 
-`src/generated/operations.json` is generated from `specs/` by `scripts/generate.ts`. Each tool:
+`src/generated/operations.json` is generated from `specs/` by `scripts/generate.ts`, keeping only the operations listed in `scripts/allowlist.ts`. The allowlist leaves out:
+
+- account settings: changing your email or password, resetting the API token, closing the account, SSO, avatars, login tokens
+- organisation, billing, subscription and user admin
+- anything that sends data out of Toggl: webhooks, calendar integrations, scheduled and shared reports, invitations, exports, iCal feeds
+- PDF, CSV and XLSX report downloads
+- deleting anything except a time entry
+
+To expose another operation, add its tool name to `scripts/allowlist.ts` with what it does (`read`, `create`, `update` or `delete`) and run `pnpm generate`. Generation fails if an allowlisted name is no longer in the specs. Each tool:
 
 - is named after the operation's `operationId`. Reports and Webhooks tools are prefixed `reports_` and `webhooks_`; their specs have no operationIds, so the name comes from the method and path.
 - takes the operation's path, query and form parameters as arguments, and its request body as `body`. Input schemas are the spec's, with references resolved.
-- returns Toggl's response verbatim. JSON and text come back as text; binary exports (PDF, XLSX) come back as a base64 resource.
-- is marked read-only for `GET` and destructive for `DELETE`.
+- returns Toggl's response as text, with secrets replaced by `[redacted]`: the `api_token` Toggl puts on your user and every workspace, iCal URLs and other token fields, and the API token anywhere else it appears, including error messages.
+- is annotated from its allowlist entry: reads (including the reports, which are POSTs) are read-only, updates and deletes are destructive.
 
 A 402 or 429 is retried after Toggl's `Retry-After` delay, up to three times, if the delay is 15 seconds or less. Otherwise the tool returns an error saying why.
 

@@ -8,7 +8,47 @@ export type Operation = {
 	description: string;
 	args: { arg: string; name: string; in: string }[];
 	inputSchema: Record<string, unknown>;
+	kind: "read" | "create" | "update" | "delete";
 };
+
+const REDACTED = "[redacted]";
+
+/** Fields that hold a credential or a link that works without logging in. Toggl puts the API token on the user and on every workspace. */
+const SECRET_FIELDS = new Set([
+	"api_token",
+	"ical_url",
+	"login_token",
+	"client_secret",
+	"secret",
+	"token",
+	"regenerate_token",
+	"fcm_registration_token",
+	"password",
+	"current_password",
+]);
+
+function redactSecretFields(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(redactSecretFields);
+	}
+	if (value === null || typeof value !== "object") {
+		return value;
+	}
+	return Object.fromEntries(
+		Object.entries(value).map(([key, field]) => [key, SECRET_FIELDS.has(key) && field ? REDACTED : redactSecretFields(field)]),
+	);
+}
+
+/** Removes secrets from anything Toggl returns before it reaches the model: known secret fields, and the API token wherever else it appears. */
+export function redact(text: string) {
+	let redacted = text;
+	try {
+		redacted = JSON.stringify(redactSecretFields(JSON.parse(text)));
+	} catch {
+		// Not JSON. The token check below still applies.
+	}
+	return env.TOGGL_API_TOKEN ? redacted.replaceAll(env.TOGGL_API_TOKEN, REDACTED) : redacted;
+}
 
 export class TogglError extends Error {
 	constructor(
@@ -59,7 +99,7 @@ export async function toggl(method: string, url: URL, body: BodyInit | undefined
 		}
 
 		console.error("Toggl request failed", { "http.status": response.status, "http.method": method, "http.path": url.pathname });
-		const detail = (await response.text()).slice(0, 500);
+		const detail = redact(await response.text()).slice(0, 500);
 		const hint = retryable && waitSeconds > MAX_WAIT_SECONDS ? ` Toggl asked to wait ${waitSeconds} seconds.` : "";
 		throw new TogglError(explain(response.status, url.pathname, detail) + hint, response.status);
 	}
@@ -132,7 +172,7 @@ export async function callOperation(operation: Operation, input: Record<string, 
 		const type = response.headers.get("Content-Type") ?? "";
 		if (type === "" || type.includes("json") || type.startsWith("text/")) {
 			const text = await response.text();
-			return { content: [{ type: "text", text: text === "" ? `${response.status} ${response.statusText || "OK"}` : text }] };
+			return { content: [{ type: "text", text: text === "" ? `${response.status} ${response.statusText || "OK"}` : redact(text) }] };
 		}
 		return {
 			content: [
