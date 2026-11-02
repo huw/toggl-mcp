@@ -170,3 +170,17 @@ dist
 
 .dev.vars
 .wrangler/
+
+# Local editor, shell and Claude Code files
+.claude/
+.mcp.json
+.idea
+.vscode
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.gitconfig
+.gitmodules
+.ripgreprc
