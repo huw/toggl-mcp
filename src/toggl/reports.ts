@@ -115,7 +115,7 @@ export async function summary(
 	const warning =
 		me.timezone === ZONE
 			? undefined
-			: `The Toggl profile timezone is ${me.timezone}, not ${ZONE}. Reports v3 reads whole days in the profile timezone, so project and client totals may shift at the range edges.`;
+			: `The Toggl profile timezone is ${me.timezone}, not ${ZONE}. Reports v3 probably reads whole days in the profile timezone, so project and client totals may shift at the range edges.`;
 
 	if (groupBy === "tag") {
 		if (subGroupBy === "task" || subGroupBy === "user") {
