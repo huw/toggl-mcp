@@ -4,10 +4,12 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-10-30",
 	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": true,
+	"preview_urls": false,
 	"vars": {
 		// Your Zero Trust team domain, and the Application Audience (AUD) tag of the Access application in front of this Worker.
-		"ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
-		"ACCESS_AUD": "<access-application-aud>"
+		"ACCESS_TEAM_DOMAIN": "hyperreal.cloudflareaccess.com",
+		"ACCESS_AUD": "13bf5c21c4da9b0a39c4dda63c75bcc1d310d7e158ff447113a3dea9af5b6002"
 	},
 	"observability": {
 		"enabled": true
