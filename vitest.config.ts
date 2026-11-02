@@ -1,34 +1,32 @@
+import { generateKeyPairSync } from "node:crypto";
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
+
+// A throwaway key pair stands in for the Access team's signing key. Tests sign with the private half; the Worker fetches the public half.
+const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const publicJwk = { ...publicKey.export({ format: "jwk" }), kid: "test", alg: "RS256", use: "sig" };
+const privateJwk = { ...privateKey.export({ format: "jwk" }), kid: "test", alg: "RS256" };
 
 export default defineConfig({
 	plugins: [
 		cloudflareTest({
 			wrangler: { configPath: "./wrangler.jsonc" },
 			miniflare: {
-				// Stands in for GitHub when the real worker runs through exports.default. The authorization code a test passes is echoed back as the access token, then as the login.
-				outboundService: async (request: Request) => {
-					const { href } = new URL(request.url);
-					if (href === "https://github.com/login/oauth/access_token") {
-						const code = new URLSearchParams(await request.text()).get("code");
-						return new Response(`access_token=${code}&token_type=bearer`, {
-							headers: { "Content-Type": "application/x-www-form-urlencoded" },
-						});
-					}
-					if (href === "https://api.github.com/user") {
-						const login = request.headers.get("Authorization")?.split(" ")[1];
-						return Response.json({ login, id: 1 });
-					}
-					return new Response(`Unmocked request: ${href}`, { status: 500 });
-				},
 				bindings: {
-					GITHUB_CLIENT_ID: "test-client-id",
-					GITHUB_CLIENT_SECRET: "test-client-secret",
-					COOKIE_ENCRYPTION_KEY: "0".repeat(64),
+					ACCESS_TEAM_DOMAIN: "test.cloudflareaccess.com",
+					ACCESS_AUD: "test-aud",
 					TOGGL_API_TOKEN: "test-toggl-token",
+					TEST_ACCESS_PRIVATE_JWK: JSON.stringify(privateJwk),
+				},
+				outboundService: (request: Request) => {
+					if (request.url === "https://test.cloudflareaccess.com/cdn-cgi/access/certs") {
+						return Response.json({ keys: [publicJwk] });
+					}
+					return new Response(`Unmocked request: ${request.url}`, { status: 500 });
 				},
 			},
 		}),
 	],
-	test: { include: ["test/**/*.test.ts"] },
+	// The first request into the Worker loads the whole bundle, which takes several seconds in the test runner.
+	test: { include: ["test/**/*.test.ts"], testTimeout: 30_000 },
 });

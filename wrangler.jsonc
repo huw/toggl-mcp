@@ -5,16 +5,10 @@
 	"compatibility_date": "2026-10-30",
 	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
-		"ALLOWED_GITHUB_USERNAME": "huw",
-		// Every OAuth token is bound to this URL. Set it to https://toggl-mcp.<subdomain>.workers.dev/mcp before deploying.
-		"MCP_RESOURCE": "http://localhost:8788/mcp"
+		// Your Zero Trust team domain, and the Application Audience (AUD) tag of the Access application in front of this Worker.
+		"ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+		"ACCESS_AUD": "<access-application-aud>"
 	},
-	"kv_namespaces": [
-		{
-			"binding": "OAUTH_KV",
-			"id": "<Add-KV-ID>"
-		}
-	],
 	"observability": {
 		"enabled": true
 	},
@@ -22,6 +16,6 @@
 		"port": 8788
 	},
 	"secrets": {
-		"required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "COOKIE_ENCRYPTION_KEY", "TOGGL_API_TOKEN"]
+		"required": ["TOGGL_API_TOKEN"]
 	}
 }

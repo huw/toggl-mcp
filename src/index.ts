@@ -1,12 +1,9 @@
-import { env } from "cloudflare:workers";
-import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/server/validators/cf-worker";
-import { createMcpHandler, getMcpAuthContext } from "agents/mcp/server";
-import { GitHubHandler } from "./github-handler";
+import { createMcpHandler } from "agents/mcp/server";
+import { isFromAccess } from "./access";
 import operations from "./generated/operations.json";
 import { callOperation, type Operation } from "./toggl";
-import type { Props } from "./utils";
 
 const validator = new CfWorkerJsonSchemaValidator();
 const tools = (operations as Operation[]).map((operation) => ({
@@ -23,29 +20,23 @@ const tools = (operations as Operation[]).map((operation) => ({
 }));
 
 function createServer() {
-	const server = new McpServer({ name: "toggl-mcp", version: "0.1.0" });
-	const props = getMcpAuthContext()?.props as Props | undefined;
-	if (props?.login.toLowerCase() === env.ALLOWED_GITHUB_USERNAME.toLowerCase()) {
-		for (const { operation, config } of tools) {
-			server.registerTool(operation.name, config, (input) => callOperation(operation, input));
-		}
+	const server = new McpServer({ name: "toggl-mcp", version: "0.2.0" });
+	for (const { operation, config } of tools) {
+		server.registerTool(operation.name, config, (input) => callOperation(operation, input));
 	}
 	return server;
 }
 
 const mcpHandler = createMcpHandler(createServer);
-const apiHandler = {
-	fetch(request: Request, bindings: Env, ctx: ExecutionContext) {
+
+export default {
+	async fetch(request, bindings, ctx) {
+		if (new URL(request.url).pathname !== "/mcp") {
+			return new Response("Not found", { status: 404 });
+		}
+		if (!(await isFromAccess(request))) {
+			return new Response("Forbidden", { status: 403 });
+		}
 		return mcpHandler(request, bindings, ctx);
 	},
 } satisfies ExportedHandler<Env>;
-
-export default new OAuthProvider<Env>({
-	apiHandler,
-	apiRoute: "/mcp",
-	authorizeEndpoint: "/authorize",
-	clientRegistrationEndpoint: "/register",
-	defaultHandler: GitHubHandler as any,
-	tokenEndpoint: "/token",
-	resourceMetadata: { resource: env.MCP_RESOURCE },
-});

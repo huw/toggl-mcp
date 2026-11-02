@@ -13,11 +13,9 @@
 		"generate": "node scripts/generate.ts"
 	},
 	"dependencies": {
-		"@cloudflare/workers-oauth-provider": "1.2.4",
 		"@modelcontextprotocol/server": "2.4.0",
 		"agents": "0.32.0",
-		"hono": "4.13.14",
-		"octokit": "5.0.5"
+		"jose": "6.2.14"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-plugin": "1.4.11",
