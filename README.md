@@ -3,44 +3,29 @@
 A personal remote MCP server for [Toggl Track](https://toggl.com/track/), running on Cloudflare Workers. It speaks streamable HTTP at `/mcp`, so claude.ai, the Claude mobile apps and Claude's cloud sessions can use it as a custom connector.
 
 - **Single user.** Sign-in is GitHub OAuth. Exactly one GitHub login is allowed; anyone else gets a 403 after signing in.
-- **Weeks run Monday to Sunday in `Australia/Sydney`.** Date ranges are inclusive calendar days in that zone.
-- **Read and write.** Reading time for a weekly review is the main use, but entries, projects, clients, tags and tasks can be changed too.
+- **The whole Toggl API, 1:1.** Every operation in Toggl's published OpenAPI specs is one MCP tool: 283 Track API v9 operations, 36 Reports API v3 and Insights operations, and 10 Webhooks operations. There are no convenience tools and no reshaping of responses.
 
 Built from Cloudflare's [`remote-mcp-github-oauth`](https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-github-oauth) template: `@cloudflare/workers-oauth-provider` handles OAuth and a stateless `createMcpHandler` serves MCP. There is no Durable Object and no `/sse` endpoint.
 
 ## Tools
 
-Read-only:
+`src/generated/operations.json` is generated from `specs/` by `scripts/generate.ts`. Each tool:
 
-| Tool | Returns |
-| --- | --- |
-| `get_me` | User, default workspace, profile timezone |
-| `list_workspaces`, `list_projects`, `list_clients`, `list_tags`, `list_tasks` | Lookups. Projects include client names. Cached about 10 minutes (in memory, cleared by any write) |
-| `get_current_entry` | The running timer, if any |
-| `list_time_entries(start_date, end_date)` | Entries overlapping the range, with description, project, client, tags, start, stop and hours (2dp). Names are resolved from IDs |
-| `summary(start_date, end_date, group_by, sub_group_by?)` | Hours by `project`, `client` or `tag`, with a grand total |
-| `weekly_review(week_start?)` | Total, per day, per project, client and tag, top 10 entries, and the change from the previous week. Defaults to last Monday to Sunday. Markdown tables |
+- is named after the operation's `operationId`. Reports and Webhooks tools are prefixed `reports_` and `webhooks_`; their specs have no operationIds, so the name comes from the method and path.
+- takes the operation's path, query and form parameters as arguments, and its request body as `body`. Input schemas are the spec's, with references resolved.
+- returns Toggl's response verbatim. JSON and text come back as text; binary exports (PDF, XLSX) come back as a base64 resource.
+- is marked read-only for `GET` and destructive for `DELETE`.
 
-Write tools (`delete_*` and `toggl_api_request` are marked destructive):
+A 402 or 429 is retried after Toggl's `Retry-After` delay, up to three times, if the delay is 15 seconds or less. Otherwise the tool returns an error saying why.
 
-- `create_time_entry` (omit `stop` to start a timer), `update_time_entry`, `stop_time_entry`, `delete_time_entry`
-- `create_`, `update_` and `delete_` for `project`, `client`, `tag` and `task`
-- `toggl_api_request`: any other Track API v9 or Reports API v3 endpoint. The path must start with `/api/v9/` or `/reports/api/v3/`
+To pick up changes to Toggl's API:
 
-Times you pass in without an offset (`2026-11-02T09:30`) are Sydney local time. With an offset or `Z` they are used as is.
+```sh
+pnpm specs:fetch   # downloads the current specs from engineering.toggl.com
+pnpm generate      # rewrites src/generated/operations.json
+```
 
-### How time is counted
-
-- A running entry has a negative duration in Toggl. It counts up to now.
-- An entry crossing midnight is split between the days. An entry crossing the edge of a range counts only the part inside it.
-- Hours are elapsed time, so the Sydney days daylight saving starts and ends are 23 and 25 hours long.
-- Toggl filters entries by start time, so the fetch window opens a day early to catch an entry that began just before the range.
-
-### Tags in `summary`
-
-Reports API v3 summaries can group by project, client or user, but not by tag. Grouping by project or client uses the Reports API. Grouping by tag is totalled from your time entries, and an entry with several tags counts toward each of them, so tag totals can add up to more than the grand total. The output says so.
-
-Reports v3 is expected to read whole days in your Toggl profile timezone, which I have not verified against the live API. If that timezone is not `Australia/Sydney`, `summary` includes a warning. Setting it to Sydney in Toggl avoids any shift at the range edges.
+Where the specs are wrong, the generator works around them: undeclared path placeholders become required arguments, `formData` parameters on `GET` operations go in the query string, and the avatar upload's `file` field is sent as a file.
 
 ## Setup
 
@@ -108,7 +93,7 @@ The MCP endpoint is `https://toggl-mcp.<your-subdomain>.workers.dev/mcp`.
 npx @modelcontextprotocol/inspector
 ```
 
-Choose the Streamable HTTP transport, enter the `/mcp` URL, and use OAuth sign-in. Then call `weekly_review` with no arguments.
+Choose the Streamable HTTP transport, enter the `/mcp` URL, and use OAuth sign-in. Then call `get_me`.
 
 ## Develop
 
@@ -120,8 +105,8 @@ pnpm dev           # needs .dev.vars, see .dev.vars.example
 
 For `pnpm dev`, set `MCP_RESOURCE` to `http://localhost:8788/mcp` and use a second GitHub OAuth app whose callback is `http://localhost:8788/callback`.
 
-Tests cover the date and timezone logic, hours rounding, the Toggl client's 402 and 429 handling, the weekly review and summaries against mocked Toggl responses, write payloads, the passthrough path guard, and the GitHub allow-list.
+Tests cover the generated surface (counts, names, path parameters, every schema compiles), request mapping, response handling, 402 and 429 handling, and the GitHub allow-list.
 
 ## Privacy
 
-Tokens and time-entry descriptions are never logged. A failed Toggl call logs only the HTTP status and path. The OAuth token carries your GitHub login and nothing else.
+Tokens and time-entry data are never logged. A failed Toggl call logs only the HTTP status, method and path. The OAuth token carries your GitHub login and nothing else.

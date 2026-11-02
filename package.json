@@ -8,16 +8,16 @@
 		"dev": "wrangler dev",
 		"cf-typegen": "wrangler types",
 		"type-check": "tsc --noEmit",
-		"test": "vitest run"
+		"test": "vitest run",
+		"specs:fetch": "node scripts/fetch-specs.ts",
+		"generate": "node scripts/generate.ts"
 	},
 	"dependencies": {
 		"@cloudflare/workers-oauth-provider": "1.2.4",
 		"@modelcontextprotocol/server": "2.4.0",
 		"agents": "0.32.0",
 		"hono": "4.13.14",
-		"octokit": "5.0.5",
-		"temporal-polyfill": "1.0.6",
-		"zod": "4.6.7"
+		"octokit": "5.0.5"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-plugin": "1.4.11",
