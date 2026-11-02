@@ -79,11 +79,4 @@ export async function fetchUpstreamAuthToken({
 	return [accessToken, null];
 }
 
-// Context from the auth process, encrypted & stored in the auth token
-// and provided to MCP handlers through getMcpAuthContext()
-export type Props = {
-	login: string;
-	name: string;
-	email: string;
-	accessToken: string;
-};
+export type Props = { login: string };

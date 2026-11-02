@@ -170,7 +170,7 @@ app.get("/callback", async (c) => {
 
 	// Fetch the user info from GitHub
 	const user = await new Octokit({ auth: accessToken }).rest.users.getAuthenticated();
-	const { login, name, email } = user.data;
+	const { login } = user.data;
 
 	if (login.toLowerCase() !== env.ALLOWED_GITHUB_USERNAME.toLowerCase()) {
 		console.error("Rejected GitHub login that is not on the allow-list");
@@ -180,15 +180,9 @@ app.get("/callback", async (c) => {
 	// Return back to the MCP client a new token
 	const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
 		metadata: {
-			label: name,
+			label: login,
 		},
-		// This will be available through getMcpAuthContext() in MCP handlers.
-		props: {
-			accessToken,
-			email,
-			login,
-			name,
-		} as Props,
+		props: { login } satisfies Props,
 		request: oauthReqInfo,
 		scope: oauthReqInfo.scope,
 		userId: login,
