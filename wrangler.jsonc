@@ -1,0 +1,21 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "toggl-mcp",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-30",
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		// Your Zero Trust team domain, and the Application Audience (AUD) tag of the Access application in front of this Worker.
+		"ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+		"ACCESS_AUD": "<access-application-aud>"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"dev": {
+		"port": 8788
+	},
+	"secrets": {
+		"required": ["TOGGL_API_TOKEN"]
+	}
+}

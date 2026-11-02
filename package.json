@@ -1,0 +1,27 @@
+{
+	"name": "toggl-mcp",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"cf-typegen": "wrangler types",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"specs:fetch": "node scripts/fetch-specs.ts",
+		"generate": "node scripts/generate.ts"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/server": "2.4.0",
+		"agents": "0.32.0",
+		"jose": "6.2.14"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-plugin": "1.4.11",
+		"@types/node": "26.6.6",
+		"typescript": "7.0.2",
+		"vitest": "5.0.5",
+		"wrangler": "4.156.0"
+	}
+}
